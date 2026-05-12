@@ -801,26 +801,33 @@ function openDetail(id) {
   badge.textContent = item.type === 'poem' ? '✦ Poem  ·  कविता' : '◈ Story  ·  कथा';
 
   title.textContent  = item.title;
-  author.textContent = item.author ? `— ${item.author}` : '';
   dateEl.textContent = item.date;
 
+  let displayContent = item.content.replace(/\\n/g, '\n');
+  let displayAuthor = item.author ? `— ${item.author}` : '';
+
   if (item.type === 'poem') {
-    // Poems: preserve line breaks
-    const lines = item.content
-      .replace(/\\n/g, '\n')
+    // Look for "Poet Name – Content" pattern at the start
+    const poemMatch = displayContent.match(/^(.+?)\s*[–-]\s+([\s\S]*)$/);
+    if (poemMatch) {
+      const nepaliName = poemMatch[1].trim();
+      displayContent = poemMatch[2].trim();
+      displayAuthor = item.author ? `— ${item.author} (${nepaliName})` : `— (${nepaliName})`;
+    }
+
+    const lines = displayContent
       .split('\n')
       .map(escHtml)
       .join('\n');
     content.innerHTML = `<div class="poem-body">${lines}</div>`;
   } else {
-    // Stories: split on double newlines or \\n
-    const raw = item.content.replace(/\\n/g, '\n');
-    const paragraphs = raw.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+    const paragraphs = displayContent.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
     content.innerHTML = `<div class="story-body">${
       paragraphs.map(p => `<p>${escHtml(p)}</p>`).join('')
     }</div>`;
   }
 
+  author.textContent = displayAuthor;
   scroll.scrollTop = 0;
   updateReadProgress();
 
