@@ -1050,37 +1050,33 @@ async function loadData() {
 }
 
 // ─── LOAD BOOK LIST ───────────────────────────────────────────────────────────
-async function loadBookList() {
-  try {
-    // Try fetching directory listing (works on GitHub Pages static hosting)
-    const res = await fetch(EPUB_DIR);
-    if (res.ok) {
-      const html = await res.text();
-      // Parse filenames from directory listing HTML
-      const matches = [...html.matchAll(/href="([^"]+\.epub)"/gi)];
-      const found = matches
-        .map(m => {
-          const raw = m[1];
-          // Strip any path prefix, keep just the filename
-          return raw.split('/').pop();
-        })
-        .filter(f => f && f.toLowerCase().endsWith('.epub'))
-        .filter((f, i, arr) => arr.indexOf(f) === i); // dedupe
+const GITHUB_API = 'https://api.github.com/repos/ayushayushayushayush/Nepali/contents/NEP_EPUB';
 
-      if (found.length > 0) {
-        books = found.map((filename, i) => ({
+async function loadBookList() {
+  // 1. Try GitHub Contents API (works on GitHub Pages, no auth needed for public repos)
+  try {
+    const res = await fetch(GITHUB_API, {
+      headers: { 'Accept': 'application/vnd.github.v3+json' }
+    });
+    if (res.ok) {
+      const files = await res.json();
+      const epubs = Array.isArray(files)
+        ? files.filter(f => f.name.toLowerCase().endsWith('.epub'))
+        : [];
+      if (epubs.length > 0) {
+        books = epubs.map((f, i) => ({
           id: 'b' + i,
           type: 'book',
-          filename,
-          title: epubFilenameToTitle(filename),
-          path: EPUB_DIR + filename,
+          filename: f.name,
+          title: epubFilenameToTitle(f.name),
+          path: EPUB_DIR + f.name,
         }));
         return;
       }
     }
   } catch (e) { /* fall through */ }
 
-  // Fallback: use hardcoded EPUB_FILES list
+  // 2. Fallback: hardcoded EPUB_FILES list
   books = EPUB_FILES.map((filename, i) => ({
     id: 'b' + i,
     type: 'book',
