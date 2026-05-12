@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Devanagari:wght@300;400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet" />
 
+  <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
   <style>
     :root {
       --ink:        #1c1008;
@@ -560,6 +561,25 @@
       transition: width 0.1s linear;
       border-radius: 0 2px 2px 0;
     }
+
+    /* ─── EPUB READER STYLES ─── */
+    #epub-viewer-container {
+      display: none;
+      flex-direction: column;
+      height: 100%;
+    }
+    #epub-viewer { flex: 1; min-height: 0; }
+    .epub-controls {
+      display: flex; justify-content: space-between; padding: 12px 20px;
+      border-top: 1px solid var(--parchment2);
+      background: var(--white);
+      gap: 10px;
+    }
+    .epub-btn {
+      flex: 1; padding: 10px; border: 1px solid var(--gold);
+      background: transparent; color: var(--ink); font-family: serif; cursor: pointer;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
@@ -586,6 +606,9 @@
     </button>
     <button class="tab-btn" data-tab="stories" onclick="switchTab('stories')">
       Stories <span class="dev-label">कथाहरू</span>
+    </button>
+    <button class="tab-btn" data-tab="books" onclick="switchTab('books')">
+      Books <span class="dev-label">पुस्तकहरू</span>
     </button>
   </div>
 
@@ -626,7 +649,15 @@
       <div id="read-progress"></div>
     </div>
     <div id="detail-scroll" onscroll="updateReadProgress()">
+    <div id="detail-scroll" style="display: block;" onscroll="updateReadProgress()">
       <div id="detail-content"></div>
+    </div>
+    <div id="epub-viewer-container">
+      <div id="epub-viewer"></div>
+      <div class="epub-controls">
+        <button class="epub-btn" onclick="prevPage()">← Previous</button>
+        <button class="epub-btn" onclick="nextPage()">Next →</button>
+      </div>
     </div>
   </div>
 </div>
@@ -635,8 +666,12 @@
 // ─── STATE ───────────────────────────────────────────────────────────────────
 let poems   = [];
 let stories = [];
+let books   = [];
 let currentTab = 'poems';
 let searchQuery = '';
+let rendition = null; // For EPUB navigation
+
+const REPO_NAME = 'ayushdkl/YOUR_REPO_NAME'; // TODO: Update this to your repo path (e.g. 'ayushdkl/my-library')
 
 // ─── CSV PARSER (handles quoted fields with newlines) ─────────────────────
 function parseCSV(text) {
@@ -715,6 +750,23 @@ async function loadData() {
       content: r['Story Content']   || '',
     }));
 
+    // Load Books from GitHub Folder
+    try {
+      const bRes = await fetch(`https://api.github.com/repos/${REPO_NAME}/contents/NEP_EPUB`);
+      if (bRes.ok) {
+        const files = await bRes.json();
+        books = files.filter(f => f.name.endsWith('.epub')).map((f, i) => ({
+          id: 'b' + i,
+          type: 'book',
+          title: f.name.replace('.epub', '').replace(/_/g, ' '),
+          author: 'Available EPUB',
+          date: '',
+          tags: ['EPUB', 'Book'],
+          url: f.download_url
+        }));
+      }
+    } catch (err) { console.warn("Could not fetch EPUB list from GitHub API", err); }
+
     hideLoading();
     renderList();
   } catch (e) {
@@ -739,6 +791,11 @@ function hideLoading() {
 // ─── RENDER LIST ─────────────────────────────────────────────────────────────
 function currentItems() {
   const pool = currentTab === 'poems' ? poems : stories;
+  let pool = [];
+  if (currentTab === 'poems') pool = poems;
+  else if (currentTab === 'stories') pool = stories;
+  else pool = books;
+
   if (!searchQuery) return pool;
   const q = searchQuery.toLowerCase();
   return pool.filter(item =>
@@ -746,6 +803,10 @@ function currentItems() {
     item.author.toLowerCase().includes(q) ||
     item.content.toLowerCase().includes(q)||
     item.tags.some(t => t.toLowerCase().includes(q))
+    (item.title && item.title.toLowerCase().includes(q))  ||
+    (item.author && item.author.toLowerCase().includes(q)) ||
+    (item.content && item.content.toLowerCase().includes(q))||
+    (item.tags && item.tags.some(t => t.toLowerCase().includes(q)))
   );
 }
 
@@ -755,6 +816,11 @@ function renderList() {
   const countEl   = document.getElementById('list-count');
 
   countEl.textContent = `${items.length} ${currentTab === 'poems' ? 'poem' : 'stor'}${items.length !== 1 ? (currentTab === 'poems' ? 's' : 'ies') : (currentTab === 'poems' ? '' : 'y')}`;
+  let label = currentTab === 'poems' ? 'poem' : (currentTab === 'stories' ? 'story' : 'book');
+  if (items.length !== 1) {
+      label = currentTab === 'poems' ? 'poems' : (currentTab === 'stories' ? 'stories' : 'books');
+  }
+  countEl.textContent = `${items.length} ${label}`;
 
   if (items.length === 0) {
     container.innerHTML = `<div class="no-results"><div class="icon">🔍</div><p>कुनै परिणाम फेला परेन।<br/>No results found.</p></div>`;
@@ -837,6 +903,7 @@ function clearSearch() {
 
 // ─── DETAIL VIEW ──────────────────────────────────────────────────────────────
 function allItems() { return [...poems, ...stories]; }
+function allItems() { return [...poems, ...stories, ...books]; }
 
 function openDetail(id) {
   const item = allItems().find(i => i.id === id);
@@ -848,17 +915,35 @@ function openDetail(id) {
   const dateEl  = document.getElementById('detail-date');
   const content = document.getElementById('detail-content');
   const scroll  = document.getElementById('detail-scroll');
+  const epubContainer = document.getElementById('epub-viewer-container');
 
   badge.className = 'detail-type-badge ' + item.type;
   badge.textContent = item.type === 'poem' ? '✦ Poem  ·  कविता' : '◈ Story  ·  कथा';
+  if (item.type === 'poem') badge.textContent = '✦ Poem  ·  कविता';
+  else if (item.type === 'story') badge.textContent = '◈ Story  ·  कथा';
+  else badge.textContent = '📖 Book · पुस्तक';
 
   title.textContent  = item.title;
   dateEl.textContent = item.date;
 
   let displayContent = item.content.replace(/\\n/g, '\n');
   let displayAuthor = item.author ? `— ${item.author}` : '';
+  if (item.type === 'book') {
+    scroll.style.display = 'none';
+    epubContainer.style.display = 'flex';
+    document.getElementById('epub-viewer').innerHTML = '';
+    const book = ePub(item.url);
+    rendition = book.renderTo("epub-viewer", { width: "100%", height: "100%", flow: "paginated" });
+    rendition.display();
+    author.textContent = 'EPUB Reader';
+  } else {
+    scroll.style.display = 'block';
+    epubContainer.style.display = 'none';
+    let displayContent = item.content.replace(/\\n/g, '\n');
+    let displayAuthor = item.author ? `— ${item.author}` : '';
 
   if (item.type === 'poem') {
+    if (item.type === 'poem') {
     // Look for "Poet Name – Content" pattern at the start
     const poemMatch = displayContent.match(/^(.+?)\s*[–-]\s+([\s\S]*)$/);
     if (poemMatch) {
@@ -877,6 +962,8 @@ function openDetail(id) {
     content.innerHTML = `<div class="story-body">${
       paragraphs.map(p => `<p>${escHtml(p)}</p>`).join('')
     }</div>`;
+    }
+    author.textContent = displayAuthor;
   }
 
   author.textContent = displayAuthor;
@@ -886,6 +973,9 @@ function openDetail(id) {
   document.getElementById('detail-overlay').style.display = 'block';
   document.body.style.overflow = 'hidden';
 }
+
+function prevPage() { if (rendition) rendition.prev(); }
+function nextPage() { if (rendition) rendition.next(); }
 
 function closeDetailBtn() {
   document.getElementById('detail-overlay').style.display = 'none';
