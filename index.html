@@ -187,8 +187,15 @@
 
     #list-view::-webkit-scrollbar { display: none; }
 
-    .list-count {
+    .list-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       padding: 10px 18px 6px;
+    }
+
+    .list-count {
+      flex: 1;
       font-size: 11px;
       color: var(--ink-soft);
       opacity: 0.5;
@@ -196,6 +203,27 @@
       letter-spacing: 0.05em;
       text-transform: uppercase;
     }
+
+    .header-spacer { flex: 1; }
+
+    #add-btn {
+      background: var(--gold);
+      color: var(--white);
+      border: none;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 3px var(--shadow);
+      transition: transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #add-btn:active { transform: scale(0.9); }
 
     .card {
       margin: 6px 14px;
@@ -577,7 +605,11 @@
          Make sure <code>nepali_poems.csv</code> and<br/>
          <code>nepali_stories.csv</code> are in the same folder as this HTML file.</p>
     </div>
-    <div class="list-count" id="list-count"></div>
+    <div class="list-header">
+      <div class="list-count" id="list-count"></div>
+      <button id="add-btn" onclick="addNewItem()" title="Add New">+</button>
+      <div class="header-spacer"></div>
+    </div>
     <div id="cards-container"></div>
   </div>
 </div>
@@ -757,6 +789,26 @@ function escHtml(s) {
 }
 
 // ─── TAB SWITCHING ────────────────────────────────────────────────────────────
+function addNewItem() {
+  const typeLabel = currentTab === 'poems' ? 'Poem' : 'Story';
+  const title = prompt(`Enter ${typeLabel} Title:`);
+  if (!title) return;
+  const author = prompt("Enter Author:");
+  const date = prompt("Enter Date:", new Date().toLocaleDateString());
+  const content = prompt("Enter Content (use \\n for line breaks):");
+
+  const newItem = {
+    id: (currentTab === 'poems' ? 'p' : 's') + Date.now(),
+    type: currentTab === 'poems' ? 'poem' : 'story',
+    title: title, author: author || '', date: date || '',
+    tags: [], content: (content || '').replace(/\\n/g, '\n')
+  };
+
+  if (currentTab === 'poems') poems.unshift(newItem);
+  else stories.unshift(newItem);
+  renderList();
+}
+
 function switchTab(tab) {
   currentTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
