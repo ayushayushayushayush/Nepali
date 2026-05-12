@@ -354,6 +354,26 @@
       max-width: 160px;
     }
 
+    .book-author-tag {
+      font-size: 11px;
+      color: var(--accent);
+      font-family: 'Noto Serif Devanagari', serif;
+      font-style: italic;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 200px;
+    }
+
+    .book-english-title {
+      margin-top: 4px;
+      font-size: 10.5px;
+      color: var(--ink-soft);
+      opacity: 0.55;
+      font-family: 'Libre Baskerville', serif;
+      font-style: italic;
+    }
+
     .book-arrow {
       display: flex;
       align-items: center;
@@ -1069,6 +1089,7 @@ async function loadBookList() {
           type: 'book',
           filename: f.name,
           title: epubFilenameToTitle(f.name),
+          author: epubFilenameToAuthor(f.name),
           path: EPUB_DIR + f.name,
         }));
         return;
@@ -1082,17 +1103,85 @@ async function loadBookList() {
     type: 'book',
     filename,
     title: epubFilenameToTitle(filename),
+    author: epubFilenameToAuthor(filename),
     path: EPUB_DIR + filename,
   }));
 }
 
+// ─── EPUB BOOK METADATA ───────────────────────────────────────────────────────
+// Maps filename (without .epub) → { title, titleNe, author, authorNe }
+const EPUB_METADATA = {
+  'aamako-sapana':               { title: 'Aamako Sapana',                    titleNe: 'आमाको सपना',                 author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'abstract-chintan-pyaj':       { title: 'Abstract Chintan Pyaj',            titleNe: 'एब्स्ट्र्याक्ट चिन्तन प्याज', author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'amar-jyotiko-satya-smriti':   { title: 'Amar Jyotiko Satya Smriti',        titleNe: 'अमर ज्योतिको सत्य स्मृति',   author: 'Motiram Bhatta',             authorNe: 'मोतीराम भट्ट' },
+  'badhusiksha':                 { title: 'Badhu Siksha',                     titleNe: 'बधूशिक्षा',                  author: 'Bhanubhakta Acharya',        authorNe: 'भानुभक्त आचार्य' },
+  'bhaktamala':                  { title: 'Bhaktamala',                       titleNe: 'भक्तमाला',                   author: 'Bhanubhakta Acharya',        authorNe: 'भानुभक्त आचार्य' },
+  'bhanubhaktaka-futkar-rachanaharu': { title: 'Bhanubhaktaka Futkar Rachanaharu', titleNe: 'भानुभक्तका फुटकर रचनाहरू', author: 'Bhanubhakta Acharya',   authorNe: 'भानुभक्त आचार्य' },
+  'bhanubhaktako-ramayan':       { title: 'Bhanubhaktako Ramayan',            titleNe: 'भानुभक्तको रामायण',          author: 'Bhanubhakta Acharya',        authorNe: 'भानुभक्त आचार्य' },
+  'bhikari':                     { title: 'Bhikari',                          titleNe: 'भिकारी',                     author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'bimba-pratibimba':            { title: 'Bimba Pratibimba',                 titleNe: 'बिम्ब प्रतिबिम्ब',           author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'bisfot':                      { title: 'Bisfot',                           titleNe: 'विस्फोट',                    author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'buddhi-binod':                { title: 'Buddhi Binod',                     titleNe: 'बुद्धि बिनोद',               author: 'Kavi Shiromani Lekhnath Paudyal', authorNe: 'कवि शिरोमणि लेखनाथ पौड्याल' },
+  'buddhibinodko-pahila-binod':  { title: 'Buddhibinodko Pahila Binod',       titleNe: 'बुद्धिबिनोदको पहिलो बिनोद',  author: 'Kavi Shiromani Lekhnath Paudyal', authorNe: 'कवि शिरोमणि लेखनाथ पौड्याल' },
+  'chadbad':                     { title: 'Chadbad',                          titleNe: 'चडबड',                       author: 'Motiram Bhatta',             authorNe: 'मोतीराम भट्ट' },
+  'champa':                      { title: 'Champa',                           titleNe: 'चम्पा',                      author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'chilla-patharu':              { title: 'Chilla Patharu',                   titleNe: 'चिल्ला पथरु',                author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'dadimko-rukhnera':            { title: 'Dadimko Rukhnera',                 titleNe: 'दादिमको रुखनेर',             author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'dushyant-shakuntala-bhet':    { title: 'Dushyant Shakuntala Bhet',         titleNe: 'दुष्यन्त शकुन्तला भेट',     author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'ek-chihan':                   { title: 'Ek Chihan',                        titleNe: 'एक चिह्न',                  author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'gauthaliko-gud':              { title: 'Gauthaliko Gud',                   titleNe: 'गौठलीको गुड',               author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'gitanjali':                   { title: 'Gitanjali',                        titleNe: 'गीतांजलि',                  author: 'Laxmi Prasad Devkota (trans.)', authorNe: 'लक्ष्मीप्रसाद देवकोटा (अनुवाद)' },
+  'godhuli-sansar':              { title: 'Godhuli Sansar',                   titleNe: 'गोधुलि संसार',              author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'guna-ratnamala':              { title: 'Guna Ratnamala',                   titleNe: 'गुण रत्नमाला',              author: 'Bhanubhakta Acharya',        authorNe: 'भानुभक्त आचार्य' },
+  'kavi-bhanubhaktako-jivancharitra': { title: 'Kavi Bhanubhaktako Jivancharitra', titleNe: 'कवि भानुभक्तको जीवनचरित्र', author: 'Motiram Bhatta',        authorNe: 'मोतीराम भट्ट' },
+  'kunjini':                     { title: 'Kunjini',                          titleNe: 'कुञ्जिनी',                  author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'lalitya-bhag-1':              { title: 'Lalitya — Part 1',                 titleNe: 'लालित्य — भाग १',            author: 'Kavi Shiromani Lekhnath Paudyal', authorNe: 'कवि शिरोमणि लेखनाथ पौड्याल' },
+  'lalitya-bhag-2':              { title: 'Lalitya — Part 2',                 titleNe: 'लालित्य — भाग २',            author: 'Kavi Shiromani Lekhnath Paudyal', authorNe: 'कवि शिरोमणि लेखनाथ पौड्याल' },
+  'laxmi-giti-sangraha':         { title: 'Laxmi Giti Sangraha',              titleNe: 'लक्ष्मी गीति सङ्ग्रह',      author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'laxmi-nibandhasangraha':      { title: 'Laxmi Nibandha Sangraha',          titleNe: 'लक्ष्मी निबन्ध सङ्ग्रह',   author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'luni':                        { title: 'Luni',                             titleNe: 'लुनी',                      author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'mero-ram':                    { title: 'Mero Ram',                         titleNe: 'मेरो राम',                  author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'mhendu':                      { title: 'Mhendu',                           titleNe: 'म्हेन्दु',                  author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'motiram-bhattaka-gajal-tatha-git': { title: 'Motiram Bhattaka Gajal tatha Git', titleNe: 'मोतीराम भट्टका गजल तथा गीत', author: 'Motiram Bhatta',        authorNe: 'मोतीराम भट्ट' },
+  'munamadan':                   { title: 'Muna Madan',                       titleNe: 'मुनामदन',                   author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'naaso':                       { title: 'Naaso',                            titleNe: 'नासो',                      author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'nepalko-sankshipta-brittanta': { title: 'Nepalko Sankshipta Brittanta',    titleNe: 'नेपालको संक्षिप्त बृत्तान्त', author: 'Bhanubhakta Acharya',       authorNe: 'भानुभक्त आचार्य' },
+  'pikdut':                      { title: 'Pikdut',                           titleNe: 'पिकदूत',                    author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'prashnottaramala':            { title: 'Prashnottaramala',                 titleNe: 'प्रश्नोत्तरमाला',           author: 'Bhanubhakta Acharya',        authorNe: 'भानुभक्त आचार्य' },
+  'prasiddha-prabandhasangraha': { title: 'Prasiddha Prabandha Sangraha',     titleNe: 'प्रसिद्ध प्रबन्ध सङ्ग्रह', author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'prithviraj-chauhan':          { title: 'Prithviraj Chauhan',               titleNe: 'पृथ्वीराज चौहान',           author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'prometheus':                  { title: 'Prometheus',                       titleNe: 'प्रोमेथियस',               author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'putali':                      { title: 'Putali',                           titleNe: 'पुतली',                     author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'raj-kumar-prabhakar':         { title: 'Raj Kumar Prabhakar',              titleNe: 'राजकुमार प्रभाकर',          author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'ravan-jatayu-yuddha':         { title: 'Ravan Jatayu Yuddha',              titleNe: 'रावण जटायु युद्ध',          author: 'Bhanubhakta Acharya',        authorNe: 'भानुभक्त आचार्य' },
+  'ritu-bichar':                 { title: 'Ritu Bichar',                      titleNe: 'ऋतुविचार',                  author: 'Kavi Shiromani Lekhnath Paudyal', authorNe: 'कवि शिरोमणि लेखनाथ पौड्याल' },
+  'satya-harishchandra-katha':   { title: 'Satya Harishchandra Katha',        titleNe: 'सत्य हरिश्चन्द्र कथा',     author: 'Bhanubhakta Acharya',        authorNe: 'भानुभक्त आचार्य' },
+  'satya-kali-sambad':           { title: 'Satya Kali Sambad',                titleNe: 'सत्यकलि सम्बाद',            author: 'Bhanubhakta Acharya',        authorNe: 'भानुभक्त आचार्य' },
+  'shakuntala':                  { title: 'Shakuntala',                       titleNe: 'शकुन्तला',                  author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'sita-haran':                  { title: 'Sita Haran',                       titleNe: 'सीता हरण',                  author: 'Bhanubhakta Acharya',        authorNe: 'भानुभक्त आचार्य' },
+  'srimadbhagvadgitako-gitasaar': { title: 'Srimadbhagavadgitako Gitasaar',  titleNe: 'श्रीमद्भगवद्गीताको गीतसार', author: 'Bhanubhakta Acharya',       authorNe: 'भानुभक्त आचार्य' },
+  'sunko-bihan':                 { title: 'Sunko Bihan',                      titleNe: 'सुनको बिहान',               author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'tarun-tapasi':                { title: 'Tarun Tapasi',                     titleNe: 'तरुण तपसी',                 author: 'Kavi Shiromani Lekhnath Paudyal', authorNe: 'कवि शिरोमणि लेखनाथ पौड्याल' },
+  'tees-rupiya-note':            { title: 'Tees Rupiya Note',                 titleNe: 'तीस रुपैयाँ नोट',           author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'tiplingi':                    { title: 'Tiplingi',                         titleNe: 'टिप्लिङ्गी',               author: 'Laxmi Prasad Devkota',       authorNe: 'लक्ष्मीप्रसाद देवकोटा' },
+  'tyag-ra-udayako-yugal-prakash': { title: 'Tyag ra Udayako Yugal Prakash', titleNe: 'त्याग र उदयको युगल प्रकाश', author: 'Kavi Shiromani Lekhnath Paudyal', authorNe: 'कवि शिरोमणि लेखनाथ पौड्याल' },
+};
+
 function epubFilenameToTitle(filename) {
-  // Remove .epub extension, decode URI encoding, replace hyphens/underscores
+  const key = filename.replace(/\.epub$/i, '').toLowerCase();
+  const meta = EPUB_METADATA[key];
+  if (meta) return meta.titleNe || meta.title;
+  // Fallback: title-case the filename
   let name = filename.replace(/\.epub$/i, '');
   try { name = decodeURIComponent(name); } catch(e) {}
   name = name.replace(/[-_]+/g, ' ').trim();
-  // Title-case ASCII parts while preserving Devanagari
   return name.replace(/\b([a-z])/g, c => c.toUpperCase());
+}
+
+function epubFilenameToAuthor(filename) {
+  const key = filename.replace(/\.epub$/i, '').toLowerCase();
+  const meta = EPUB_METADATA[key];
+  return meta ? (meta.authorNe || meta.author) : '';
 }
 
 function parseTags(raw) {
@@ -1150,7 +1239,13 @@ function renderList() {
   }
 
   if (currentTab === 'books') {
-    container.innerHTML = items.map((item, idx) => `
+    container.innerHTML = items.map((item, idx) => {
+      // Get English title for subtitle if we have it
+      const key = (item.filename || '').replace(/\.epub$/i, '').toLowerCase();
+      const meta = EPUB_METADATA[key];
+      const englishTitle = meta ? meta.title : '';
+      const authorDisplay = item.author || '';
+      return `
       <div class="book-card" style="animation: fadeIn 0.3s ease ${idx * 0.03}s both"
            onclick="openBook('${item.id}')">
         <div class="book-spine"></div>
@@ -1158,12 +1253,13 @@ function renderList() {
           <div class="book-card-title">${escHtml(item.title)}</div>
           <div class="book-card-meta">
             <span class="book-badge">📖 EPUB</span>
-            <span class="book-filename">${escHtml(item.filename)}</span>
+            ${authorDisplay ? `<span class="book-author-tag">${escHtml(authorDisplay)}</span>` : ''}
           </div>
+          ${englishTitle ? `<div class="book-english-title">${escHtml(englishTitle)}</div>` : ''}
         </div>
         <div class="book-arrow">›</div>
       </div>
-    `).join('');
+    `}).join('');
     return;
   }
 
