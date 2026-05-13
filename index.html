@@ -1016,51 +1016,6 @@ function parseCSV(text) {
   });
 }
 
-// ─── POEM CONTENT PARSER ─────────────────────────────────────────────────────
-function hasNepaliDigit(str) {
-  // Nepali digits: ०-९, or ASCII digits
-  return /[०-९0-9]/.test(str);
-}
-
-function parsePoemContent(raw) {
-  let content = raw.replace(/\\n/g, '\n');
-  let titleNe = '';
-  let date = '';
-  let authorNe = '';
-
-  // Step 1: Remove leading poet name line (format: "Name – rest" or just a name line before poem)
-  // The existing code handles poet removal via regex in openDetail, keep that logic
-  // But first extract authorNe from "poetname (nepali)" pattern if present
-  const authorNeMatch = content.match(/^(.+?)\s*[–\-]\s+(.+?)(?:\n|$)/);
-  if (authorNeMatch) {
-    // The nepali part after dash could be nepali author name — but we check if it contains devanagari
-    const afterDash = authorNeMatch[2].trim();
-    if (/[\u0900-\u097F]/.test(afterDash)) {
-      authorNe = afterDash.split('\n')[0].trim();
-    }
-    // Remove the poet name line
-    content = content.replace(/^.+?[–\-].+?\n/, '').trimStart();
-  }
-
-  // Step 2: First remaining line is the Nepali poem title
-  const lines = content.split('\n');
-  if (lines.length > 0 && /[\u0900-\u097F]/.test(lines[0])) {
-    titleNe = lines[0].trim();
-    lines.shift();
-  }
-
-  // Step 3: If the next line contains a number, treat it as date and remove it
-  if (lines.length > 0 && hasNepaliDigit(lines[0]) && lines[0].trim().length < 60) {
-    date = lines[0].trim().replace(/^\(|\)$/g, '').trim();
-    lines.shift();
-  }
-
-  // Remove any leading blank lines from remaining content
-  while (lines.length > 0 && lines[0].trim() === '') lines.shift();
-
-  return { titleNe, date, authorNe, content: lines.join('\n') };
-}
-
 // ─── LOAD DATA ────────────────────────────────────────────────────────────────
 async function loadData() {
   try {
@@ -1072,21 +1027,14 @@ async function loadData() {
     if (!pRes.ok || !sRes.ok) throw new Error('fetch failed');
     const [pText, sText] = await Promise.all([pRes.text(), sRes.text()]);
 
-    poems = parseCSV(pText).map((r, i) => {
-      let content = r['Poem Content'] || '';
-      // Parse out the Nepali title (first line after poet name removal) and date (second line if has number)
-      const parsed = parsePoemContent(content);
-      return {
-        id: 'p' + i, type: 'poem',
-        title:    r['Title (English)'] || `Poem ${i+1}`,
-        titleNe:  parsed.titleNe || '',
-        author:   r['Poet / Author']  || '',
-        authorNe: parsed.authorNe || '',
-        date:     parsed.date || r['Date Published'] || '',
-        tags:     parseTags(r['Tags'] || ''),
-        content:  parsed.content,
-      };
-    });
+    poems = parseCSV(pText).map((r, i) => ({
+      id: 'p' + i, type: 'poem',
+      title:   r['Title (English)'] || `Poem ${i+1}`,
+      author:  r['Poet / Author']   || '',
+      date:    r['Date Published']  || '',
+      tags:    parseTags(r['Tags']  || ''),
+      content: r['Poem Content']    || '',
+    }));
 
     stories = parseCSV(sText).map((r, i) => ({
       id: 's' + i, type: 'story',
@@ -1297,13 +1245,13 @@ function renderList() {
   }
 
   container.innerHTML = items.map((item, idx) => {
-    const displayTitle = item.titleNe || item.title;
-    const displayAuthor = item.authorNe || item.author;
+    const shortDate = item.date.split(',').pop()?.trim() || item.date;
     return `
       <div class="card" style="animation-delay:${idx * 0.03}s" onclick="openDetail('${item.id}')">
-        <div class="card-title">${escHtml(displayTitle)}</div>
+        <div class="card-title">${escHtml(item.title)}</div>
         <div class="card-meta">
-          <div class="card-author">${escHtml(displayAuthor)}</div>
+          <div class="card-author">${escHtml(item.author)}</div>
+          <div class="card-date">${escHtml(shortDate)}</div>
         </div>
       </div>
     `;
@@ -1414,27 +1362,18 @@ function openDetail(id) {
   badge.className = 'detail-type-badge ' + item.type;
   badge.textContent = item.type === 'poem' ? '✦ Poem  ·  कविता' : '◈ Story  ·  कथा';
 
-  // Use Nepali title if available
-  title.textContent  = item.titleNe || item.title;
-
-  // Show date only if available from parsed content
-  if (item.date) {
-    dateEl.textContent = item.date;
-    dateEl.style.display = '';
-  } else {
-    dateEl.textContent = '';
-    dateEl.style.display = 'none';
-  }
+  title.textContent  = item.title;
+  dateEl.textContent = item.date;
 
   let displayContent = item.content.replace(/\\n/g, '\n');
-  let displayAuthor  = (item.authorNe || item.author) ? `— ${item.authorNe || item.author}` : '';
+  let displayAuthor  = item.author ? `— ${item.author}` : '';
 
   if (item.type === 'poem') {
-    // Content is already cleaned by parsePoemContent; just remove any remaining poet-name prefix
     const poemMatch = displayContent.match(/^(.+?)\s*[–-]\s+([\s\S]*)$/);
-    if (poemMatch && !/[\u0900-\u097F]/.test(poemMatch[1])) {
-      // Only strip if the part before dash is not Nepali (it's an English poet name leftover)
+    if (poemMatch) {
+      const nepaliName = poemMatch[1].trim();
       displayContent = poemMatch[2].trim();
+      displayAuthor = item.author ? `— ${item.author} (${nepaliName})` : `— (${nepaliName})`;
     }
     content.innerHTML = `<div class="poem-body">${displayContent.split('\n').map(escHtml).join('\n')}</div>`;
   } else {
