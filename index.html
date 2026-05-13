@@ -1500,7 +1500,7 @@ async function explainWithGemini() {
     </div>`;
   scroll.scrollTop = 0;
 
-  const GEMINI_API_KEY = 'AIzaSyA31R0U35iTZtbYq6u4M70NBooOwIofsxg';
+  const GEMINI_API_KEY = 'AIzaSyDdp3v396lXCwF4_0kwT13ccyX_d9hfiBM';
   const prompt = `You are a Nepali literary expert. Explain this Nepali poem titled "${currentPoemTitle}" line by line (or stanza by stanza for short stanzas). 
 
 For each line or stanza, first quote it exactly as it appears, then provide a clear explanation in English of what it means, its imagery, and its significance. 
@@ -1513,7 +1513,7 @@ ${currentPoemText}`;
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
