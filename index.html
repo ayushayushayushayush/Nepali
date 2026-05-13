@@ -1263,7 +1263,7 @@ function renderList() {
 
   container.innerHTML = items.map((item, idx) => {
     const authorDisplay = (item.type === 'poem' && item.authorNe)
-      ? `${escHtml(item.authorNe)} (${escHtml(item.author)})`
+      ? `${escHtml(item.author)} (${escHtml(item.authorNe)})`
       : escHtml(item.author);
     return `
       <div class="card" style="animation-delay:${idx * 0.03}s" onclick="openDetail('${item.id}')">
