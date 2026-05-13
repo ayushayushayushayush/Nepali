@@ -74,7 +74,8 @@
 
     /* ─── TOPBAR SEARCH ─── */
     #topbar-search {
-      flex: 1;
+      flex: 0 1 160px;
+      min-width: 0;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -710,11 +711,17 @@
 
     /* epub topbar nav buttons */
     .epub-topbar-nav {
-      padding: 5px 10px;
-      font-size: 16px;
-      border: 1px solid #333;
+      background: none;
+      border: none;
+      color: var(--gold-light);
+      font-size: 18px;
+      padding: 4px 8px;
+      cursor: pointer;
       flex-shrink: 0;
+      opacity: 0.75;
+      -webkit-tap-highlight-color: transparent;
     }
+    .epub-topbar-nav:disabled { opacity: 0.25; cursor: default; }
 
     /* Epub bottom nav */
     #epub-nav { display: none; }
@@ -923,10 +930,10 @@
       </svg>
       Back
     </button>
-    <button class="epub-nav-btn epub-topbar-nav" id="epub-prev-btn" onclick="epubPrevChapter()">←</button>
     <div id="epub-book-title">Loading…</div>
-    <button class="epub-nav-btn epub-topbar-nav" id="epub-next-btn" onclick="epubNextChapter()">→</button>
+    <button class="epub-topbar-nav" id="epub-prev-btn" onclick="epubPrevChapter()">←</button>
     <div id="epub-chapter-info" onclick="toggleToc()" style="cursor:pointer;" title="Table of Contents"></div>
+    <button class="epub-topbar-nav" id="epub-next-btn" onclick="epubNextChapter()">→</button>
   </div>
 
   <div style="position:relative; flex:1; display:flex; flex-direction:column; overflow:hidden;">
