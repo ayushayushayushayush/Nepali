@@ -1339,52 +1339,54 @@ function parseCSV(text) {
 
 // ─── LOAD DATA ────────────────────────────────────────────────────────────────
 async function loadData() {
+  // Load CSVs — fail gracefully so audiobooks/books still render
   try {
     const [pRes, sRes] = await Promise.all([
-      fetch('nepali_poems.csv'),
-      fetch('nepali_stories.csv')
+      fetch('nepali_poems.csv').catch(() => null),
+      fetch('nepali_stories.csv').catch(() => null)
     ]);
 
-    if (!pRes.ok || !sRes.ok) throw new Error('fetch failed');
-    const [pText, sText] = await Promise.all([pRes.text(), sRes.text()]);
+    if (pRes && pRes.ok) {
+      const pText = await pRes.text();
+      poems = parseCSV(pText).map((r, i) => {
+        const author  = r['Poet / Author'] || '';
+        const content = r['Poem Content']  || '';
+        let authorNe = '';
+        const neMatch = content.replace(/\\n/g, '\n').match(/^(.+?)\s*[–-]\s+/);
+        if (neMatch) {
+          const candidate = neMatch[1].trim();
+          if (/[\u0900-\u097F]/.test(candidate)) authorNe = candidate;
+        }
+        return {
+          id: 'p' + i, type: 'poem',
+          title:   r['Title (English)'] || `Poem ${i+1}`,
+          author,
+          authorNe,
+          tags:    parseTags(r['Tags']  || ''),
+          content,
+        };
+      });
+    }
 
-    poems = parseCSV(pText).map((r, i) => {
-      const author  = r['Poet / Author'] || '';
-      const content = r['Poem Content']  || '';
-      // Extract Nepali author name from content: the leading "NepaliName – ..." line
-      let authorNe = '';
-      const neMatch = content.replace(/\\n/g, '\n').match(/^(.+?)\s*[–-]\s+/);
-      if (neMatch) {
-        const candidate = neMatch[1].trim();
-        if (/[\u0900-\u097F]/.test(candidate)) authorNe = candidate;
-      }
-      return {
-        id: 'p' + i, type: 'poem',
-        title:   r['Title (English)'] || `Poem ${i+1}`,
-        author,
-        authorNe,
+    if (sRes && sRes.ok) {
+      const sText = await sRes.text();
+      stories = parseCSV(sText).map((r, i) => ({
+        id: 's' + i, type: 'story',
+        title:   r['Title (English)'] || `Story ${i+1}`,
+        author:  r['Author']          || '',
         tags:    parseTags(r['Tags']  || ''),
-        content,
-      };
-    });
-
-    stories = parseCSV(sText).map((r, i) => ({
-      id: 's' + i, type: 'story',
-      title:   r['Title (English)'] || `Story ${i+1}`,
-      author:  r['Author']          || '',
-      tags:    parseTags(r['Tags']  || ''),
-      content: r['Story Content']   || '',
-    }));
-
-    await loadBookList();
-    loadAudiobooks();
-    hideLoading();
-    renderList();
+        content: r['Story Content']   || '',
+      }));
+    }
   } catch (e) {
-    hideLoading();
-    document.getElementById('error-state').style.display = 'block';
-    console.error(e);
+    console.warn('CSV load error:', e);
   }
+
+  // Always load books and audiobooks regardless of CSV status
+  try { await loadBookList(); } catch (e) { console.warn('Book list error:', e); }
+  loadAudiobooks();
+  hideLoading();
+  renderList();
 }
 
 // ─── LOAD BOOK LIST ───────────────────────────────────────────────────────────
